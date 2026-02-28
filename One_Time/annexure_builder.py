@@ -26,7 +26,7 @@ def build_annexure_row(row, charges, gst_values):
     else:
         doj_display = ""
     
-    # Build base row data (without GST columns)
+    # Build base row data - Total first, then GST columns, then Grand Total
     row_data = {
         "Kind Attention Person": row["Kind Attention Person"],
         "Working At": row.get("Working At", ""),
@@ -38,15 +38,17 @@ def build_annexure_row(row, charges, gst_values):
         "Biiling": row.get("Billing", ""),
         "Charges": round(charges, 2),
         "Total": round(charges, 2),
-        "Grand Total": round(grand_total, 2),
-        "Remark": row.get("Remark", "")
     }
     
-    # Add only the applicable GST columns
+    # Add only the applicable GST columns after Total and before Grand Total
     if has_igst:
         row_data["IGST @18%"] = round(igst, 2)
     else:
         row_data["CGST @9%"] = round(cgst, 2)
         row_data["SGST @9%"] = round(sgst, 2)
+    
+    # Add Grand Total at the end
+    row_data["Grand Total"] = round(grand_total, 2)
+    row_data["Remark"] = row.get("Remark", "")
     
     return row_data

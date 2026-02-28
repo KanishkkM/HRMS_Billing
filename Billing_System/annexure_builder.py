@@ -28,15 +28,17 @@ def build_annexure_row(row, totals, gst_values):
         "Out of Pocket Exp": round(row["Out of Pocket Exp"], 2),
         "Arrears": round(row["Arrears"], 2),
         "Total": round(totals["total"], 2),
-        "Grand Total": round(grand_total, 2),
-        "Remark": row.get("Remark", "")
     }
     
-    # Add only the applicable GST columns
-    if has_igst:
-        row_data["IGST @18%"] = round(igst, 2)
-    else:
-        row_data["CGST @9%"] = round(cgst, 2)
-        row_data["SGST @9%"] = round(sgst, 2)
+    # Always add ALL GST columns to ensure consistent column ordering across rows.
+    # When mixing IGST and CGST/SGST rows in the same DataFrame, missing keys
+    # get appended at the end, causing IGST to appear after Grand Total.
+    row_data["CGST @9%"] = round(cgst, 2)
+    row_data["SGST @9%"] = round(sgst, 2)
+    row_data["IGST @18%"] = round(igst, 2)
+    
+    # Add Grand Total at the end
+    row_data["Grand Total"] = round(grand_total, 2)
+    row_data["Remark"] = row.get("Remark", "")
     
     return row_data

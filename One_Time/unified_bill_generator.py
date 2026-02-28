@@ -203,50 +203,63 @@ def add_totals_to_annexure(ws, group_df, start_row, annex_columns):
     # Write "TOTAL" in first column
     ws.cell(row=total_row, column=1, value="TOTAL")
     
-    # Store column positions for Grand Total calculation
-    total_col = None
-    cgst_col = None
-    sgst_col = None
-    igst_col = None
-    
-    # Add formulas for numeric columns
+    # First pass: identify column positions for all relevant columns
+    # Also check if IGST has actual data (non-zero values)
+    has_igst_data = False
     for col_idx, col_name in enumerate(annex_columns, 1):
         if col_name in numeric_columns:
-            col_letter = chr(64 + col_idx)
+            if col_name == "Total":
+                total_col = col_idx
+            elif col_name == "CGST @9%":
+                cgst_col = col_idx
+            elif col_name == "SGST @9%":
+                sgst_col = col_idx
+            elif col_name == "IGST @18%":
+                igst_col = col_idx
+                # Check if IGST column has any non-zero values in the data
+                if col_name in group_df.columns:
+                    if group_df[col_name].sum() > 0:
+                        has_igst_data = True
+    
+    # Second pass: create formulas for all numeric columns
+    for col_idx, col_name in enumerate(annex_columns, 1):
+        if col_name not in numeric_columns:
+            continue
             
-            if col_name == "Grand Total":
-                # Calculate Grand Total as sum of Total + CGST + SGST + IGST
-                grand_total_formula_parts = []
-                if total_col:
-                    grand_total_formula_parts.append(f"{chr(64 + total_col)}{total_row}")
+        col_letter = chr(64 + col_idx)
+        
+        if col_name == "Grand Total":
+            # Calculate Grand Total as sum of Total + applicable GST
+            # Use either CGST+SGST OR IGST, not both
+            grand_total_formula_parts = []
+            if total_col:
+                grand_total_formula_parts.append(f"{chr(64 + total_col)}{total_row}")
+            
+            # Check if IGST is present (column exists and has data)
+            has_igst = has_igst_data
+            
+            if has_igst:
+                # Use IGST only (not CGST/SGST)
+                if igst_col:
+                    grand_total_formula_parts.append(f"{chr(64 + igst_col)}{total_row}")
+            else:
+                # Use CGST + SGST
                 if cgst_col:
                     grand_total_formula_parts.append(f"{chr(64 + cgst_col)}{total_row}")
                 if sgst_col:
                     grand_total_formula_parts.append(f"{chr(64 + sgst_col)}{total_row}")
-                if igst_col:
-                    grand_total_formula_parts.append(f"{chr(64 + igst_col)}{total_row}")
-                
-                if grand_total_formula_parts:
-                    formula = f"=ROUND(SUM({','.join(grand_total_formula_parts)}), 0)"
-                else:
-                    formula = f"=ROUND(SUM({col_letter}{start_row}:{col_letter}{total_row - 1}), 0)"
-            else:
-                if col_name == "CGST @9%" or col_name == "SGST @9%":
-                    formula = f"=CEILING(SUM({col_letter}{start_row}:{col_letter}{total_row - 1}), 1)"
-                else:
-                    formula = f"=ROUND(SUM({col_letter}{start_row}:{col_letter}{total_row - 1}), 0)"
-                
-                # Store column positions for Grand Total calculation
-                if col_name == "Total":
-                    total_col = col_idx
-                elif col_name == "CGST @9%":
-                    cgst_col = col_idx
-                elif col_name == "SGST @9%":
-                    sgst_col = col_idx
-                elif col_name == "IGST @18%":
-                    igst_col = col_idx
             
-            ws.cell(row=total_row, column=col_idx, value=formula)
+            if grand_total_formula_parts:
+                formula = f"=ROUND(SUM({','.join(grand_total_formula_parts)}), 0)"
+            else:
+                formula = f"=ROUND(SUM({col_letter}{start_row}:{col_letter}{total_row - 1}), 0)"
+        else:
+            if col_name == "CGST @9%" or col_name == "SGST @9%":
+                formula = f"=CEILING(SUM({col_letter}{start_row}:{col_letter}{total_row - 1}), 1)"
+            else:
+                formula = f"=ROUND(SUM({col_letter}{start_row}:{col_letter}{total_row - 1}), 0)"
+        
+        ws.cell(row=total_row, column=col_idx, value=formula)
     
     return total_row
 
@@ -284,6 +297,12 @@ def generate_unified_bills(annex_df):
         
         # Remove Split_Key column from output
         group_clean = group.drop(columns=["Split_Key"])
+        
+        # Remove IGST column if it's not used (all zeros/empty) for this bill
+        # This ensures IGST doesn't appear in annexure when CGST/SGST are used
+        if "IGST @18%" in group_clean.columns:
+            if group_clean["IGST @18%"].sum() == 0:
+                group_clean = group_clean.drop(columns=["IGST @18%"])
         
         # Check if template exists
         has_template = key in template_files

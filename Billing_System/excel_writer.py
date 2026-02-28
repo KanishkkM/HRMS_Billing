@@ -90,17 +90,26 @@ def write_outputs(annex_df):
                         igst_col = col_idx
             
             # Now calculate Grand Total as sum of Total + applicable GST columns
+            # Check if IGST has actual data (non-zero values)
+            has_igst_data = False
+            if "IGST @18%" in output_data.columns:
+                has_igst_data = output_data["IGST @18%"].sum() > 0
+            
             if grand_total_col is not None:
                 grand_total_letter = chr(65 + grand_total_col)
                 grand_total_formula_parts = []
                 if total_col is not None:
                     grand_total_formula_parts.append(f"{chr(65 + total_col)}{last_row + 1}")
-                if cgst_col is not None:
-                    grand_total_formula_parts.append(f"{chr(65 + cgst_col)}{last_row + 1}")
-                if sgst_col is not None:
-                    grand_total_formula_parts.append(f"{chr(65 + sgst_col)}{last_row + 1}")
-                if igst_col is not None:
-                    grand_total_formula_parts.append(f"{chr(65 + igst_col)}{last_row + 1}")
+                
+                # Use either CGST+SGST OR IGST, not both
+                if has_igst_data:
+                    if igst_col is not None:
+                        grand_total_formula_parts.append(f"{chr(65 + igst_col)}{last_row + 1}")
+                else:
+                    if cgst_col is not None:
+                        grand_total_formula_parts.append(f"{chr(65 + cgst_col)}{last_row + 1}")
+                    if sgst_col is not None:
+                        grand_total_formula_parts.append(f"{chr(65 + sgst_col)}{last_row + 1}")
                 
                 if grand_total_formula_parts:
                     formula = f'=ROUND(SUM({",".join(grand_total_formula_parts)}), 0)'

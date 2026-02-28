@@ -10,7 +10,7 @@ INPUT_EMPLOYEE_FILE = "Data/Employee.xlsx"
 INPUT_CHARGES_FILE = "Data/Charges_OneTime.xlsx"
 
 # Template and Assets Folders
-TEMPLATE_FOLDER = "Templates"
+TEMPLATE_FOLDER = "One_Time_Template"
 ASSETS_FOLDER = "Assets"
 
 # Output Folders

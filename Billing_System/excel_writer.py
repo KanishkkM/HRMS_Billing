@@ -33,10 +33,23 @@ def write_outputs(annex_df):
             total_format = workbook.add_format({'bold': True, 'bg_color': '#FFFF99'})
             whole_number_format = workbook.add_format({'num_format': '0'})
 
-            # ---------- APPLY WHOLE NUMBER FORMAT ----------
-            numeric_columns = [3,10,13,14,15,16,17,18,19,20,21,22,23]
+            # ---------- DETERMINE NUMERIC COLUMNS DYNAMICALLY ----------
+            # Get all column names that exist in the dataframe
+            numeric_col_names = []
+            for col_name in output_data.columns:
+                # Skip non-numeric columns
+                if col_name in ["Kind Attention Person", "Company Name", "Employee Code", 
+                                "Employee Name", "Billing Cycle", "Remark", "Working At",
+                                "Reporting Person", "Date of Joining"]:
+                    continue
+                numeric_col_names.append(col_name)
 
-            for col_idx in numeric_columns:
+            # Get column indices for numeric columns
+            col_indices = {name: idx for idx, name in enumerate(output_data.columns)}
+
+            # Apply whole number format to numeric columns
+            for col_name in numeric_col_names:
+                col_idx = col_indices[col_name]
                 col_letter = chr(65 + col_idx)
                 worksheet.set_column(f'{col_letter}:{col_letter}', 18, whole_number_format)
 
@@ -45,16 +58,17 @@ def write_outputs(annex_df):
 
             worksheet.write(last_row, 0, "TOTAL", bold_format)
 
-            # First, add formulas for all numeric columns except Grand Total to get their totals
+            # Store column positions for Grand Total calculation
             total_col = None
             cgst_col = None
             sgst_col = None
             igst_col = None
             grand_total_col = None
             
-            for col_idx in numeric_columns:
+            # Add formulas for numeric columns
+            for col_name in numeric_col_names:
+                col_idx = col_indices[col_name]
                 col_letter = chr(65 + col_idx)
-                col_name = output_data.columns[col_idx]
                 
                 if col_name == "Grand Total":
                     grand_total_col = col_idx
@@ -75,7 +89,7 @@ def write_outputs(annex_df):
                     elif col_name == "IGST @18%":
                         igst_col = col_idx
             
-            # Now calculate Grand Total as sum of Total + CGST + SGST + IGST
+            # Now calculate Grand Total as sum of Total + applicable GST columns
             if grand_total_col is not None:
                 grand_total_letter = chr(65 + grand_total_col)
                 grand_total_formula_parts = []
@@ -109,9 +123,23 @@ def write_summary(annex_df):
         total_format = workbook.add_format({'bold': True, 'bg_color': '#FFFF99'})
         whole_number_format = workbook.add_format({'num_format': '0'})
 
-        numeric_columns = [3,10,13,14,15,16,17,18,19,20,21,22,23]
+        # ---------- DETERMINE NUMERIC COLUMNS DYNAMICALLY ----------
+        # Get all column names that exist in the dataframe
+        numeric_col_names = []
+        for col_name in annex_df.columns:
+            # Skip non-numeric columns
+            if col_name in ["Kind Attention Person", "Company Name", "Employee Code", 
+                            "Employee Name", "Billing Cycle", "Remark", "Working At",
+                            "Reporting Person", "Date of Joining"]:
+                continue
+            numeric_col_names.append(col_name)
 
-        for col_idx in numeric_columns:
+        # Get column indices for numeric columns
+        col_indices = {name: idx for idx, name in enumerate(annex_df.columns)}
+
+        # Apply whole number format to numeric columns
+        for col_name in numeric_col_names:
+            col_idx = col_indices[col_name]
             col_letter = chr(65 + col_idx)
             worksheet.set_column(f'{col_letter}:{col_letter}', 18, whole_number_format)
 
@@ -119,10 +147,9 @@ def write_summary(annex_df):
 
         worksheet.write(last_row, 0, "TOTAL", bold_format)
 
-        for col_idx in numeric_columns:
+        for col_name in numeric_col_names:
+            col_idx = col_indices[col_name]
             col_letter = chr(65 + col_idx)
-            # Determine column name from DataFrame to check if it's CGST or SGST
-            col_name = annex_df.columns[col_idx]
             if col_name == "CGST @9%" or col_name == "SGST @9%":
                 formula = f'=CEILING(SUM({col_letter}2:{col_letter}{last_row}), 1)'
             else:

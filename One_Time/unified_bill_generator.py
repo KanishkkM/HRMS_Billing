@@ -29,6 +29,52 @@ def number_to_words_indian(num):
         return f"{num} Only"
 
 
+# ================= FILL BILL TEMPLATE =================
+def fill_bill_template(ws, group_df):
+    """
+    Fill the bill template with One_Time billing data:
+    - Bill Date: G12
+    - Due Date: G13
+    - Sum of Charges: H17:H20 (merged)
+    - CGST: H21
+    - SGST: H22
+    - Total (Grand Total): H23:H25 (merged)
+    - Rupees(In words): B24
+    """
+    # Get totals from the group dataframe
+    total_charges = round(group_df["Charges"].sum())
+    cgst = round(group_df["CGST @9%"].sum())
+    sgst = round(group_df["SGST @9%"].sum())
+    igst = round(group_df["IGST @18%"].sum())
+    grand_total = round(group_df["Grand Total"].sum())
+    
+    today = date.today()
+    due_date = today + timedelta(days=3)
+    
+    # Dates
+    ws["G12"] = today.strftime("%d-%m-%Y")
+    ws["G13"] = due_date.strftime("%d-%m-%Y")
+    
+    # Sum of Charges (merged H17:H20)
+    ws.merge_cells("H17:H20")
+    ws["H17"] = total_charges
+    
+    # GST
+    if igst > 0:
+        ws.merge_cells("H21:H22")
+        ws["H21"] = igst
+    else:
+        ws["H21"] = cgst
+        ws["H22"] = sgst
+    
+    # Grand Total (merged H23:H25)
+    ws.merge_cells("H23:H25")
+    ws["H23"] = grand_total
+    
+    # Amount in Words
+    ws["B24"] = number_to_words_indian(grand_total)
+
+
 # ================= FORMAT ANNEXURE SHEET =================
 def format_annexure_sheet(ws, num_data_rows, num_cols):
     """
@@ -248,8 +294,11 @@ def generate_unified_bills(annex_df):
             
             try:
                 wb = load_workbook(template_path)
-                # For now, just create annexure sheet
-                # Could add bill template filling here similar to recurring
+                # Get the first sheet (bill sheet) and fill it with data
+                bill_sheet = wb.active
+                fill_bill_template(bill_sheet, group_clean)
+                
+                # Create annexure sheet
                 annex_sheet = wb.create_sheet("Annexure")
             except Exception as e:
                 print(f"Error loading template for {key}: {e}")
@@ -293,19 +342,27 @@ def generate_unified_bills(annex_df):
         # Save workbook
         wb.save(output_path)
         
-        # Collect summary data
-        all_summaries.append({
+        # Collect summary data - dynamically handle GST columns
+        summary_data = {
             "Kind Attention Person": group_clean.iloc[0]["Kind Attention Person"] if len(group_clean) > 0 else "",
             "Working At": group_clean.iloc[0]["Working At"] if len(group_clean) > 0 else "",
             "Company Name": company_name,
             "No of Employees": len(group_clean),
             "Total Charges": round(group_clean["Charges"].sum()),
             "Total Amount": round(group_clean["Total"].sum()),
-            "CGST": round(group_clean["CGST @9%"].sum()),
-            "SGST": round(group_clean["SGST @9%"].sum()),
-            "IGST": round(group_clean["IGST @18%"].sum()),
             "Grand Total": round(group_clean["Grand Total"].sum())
-        })
+        }
+        
+        # Add only the applicable GST columns
+        if "IGST @18%" in group_clean.columns:
+            summary_data["IGST"] = round(group_clean["IGST @18%"].sum())
+        else:
+            if "CGST @9%" in group_clean.columns:
+                summary_data["CGST"] = round(group_clean["CGST @9%"].sum())
+            if "SGST @9%" in group_clean.columns:
+                summary_data["SGST"] = round(group_clean["SGST @9%"].sum())
+        
+        all_summaries.append(summary_data)
         
         status = "with Bill" if has_template else "Annexure only"
         print(f"Generated {key} ({status})")

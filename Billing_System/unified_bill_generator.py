@@ -386,8 +386,8 @@ def generate_unified_bills(annex_df):
         # Save workbook
         wb.save(output_path)
         
-        # Collect summary data
-        all_summaries.append({
+        # Collect summary data - dynamically handle GST columns
+        summary_data = {
             "Kind Attention Person": group_clean.iloc[0]["Kind Attention Person"] if len(group_clean) > 0 else "",
             "Working At": group_clean.iloc[0]["Working At"] if len(group_clean) > 0 else "",
             "Company Name": company_name,
@@ -398,11 +398,19 @@ def generate_unified_bills(annex_df):
             "Total Out of Pocket": round(group_clean["Out of Pocket Exp"].sum()),
             "Total Arrears": round(group_clean["Arrears"].sum()),
             "Total Amount": round(group_clean["Total"].sum()),
-            "CGST": round(group_clean["CGST @9%"].sum()),
-            "SGST": round(group_clean["SGST @9%"].sum()),
-            "IGST": round(group_clean["IGST @18%"].sum()),
             "Grand Total": round(group_clean["Grand Total"].sum())
-        })
+        }
+        
+        # Add only the applicable GST columns
+        if "IGST @18%" in group_clean.columns:
+            summary_data["IGST"] = round(group_clean["IGST @18%"].sum())
+        else:
+            if "CGST @9%" in group_clean.columns:
+                summary_data["CGST"] = round(group_clean["CGST @9%"].sum())
+            if "SGST @9%" in group_clean.columns:
+                summary_data["SGST"] = round(group_clean["SGST @9%"].sum())
+        
+        all_summaries.append(summary_data)
         
         status = "with Bill" if has_template else "Annexure only"
         print(f"Generated {key} ({status})")

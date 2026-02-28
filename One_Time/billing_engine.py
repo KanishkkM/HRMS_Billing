@@ -1,8 +1,19 @@
 import pandas as pd
 from datetime import date
+import calendar
 from config import *
+from shared.helpers import get_billing_dates_pd
 from charge_mapper import ChargeMapperOneTime
 from annexure_builder import build_annexure_row
+
+
+def get_billing_dates(cycle, month, year):
+    """
+    Get billing start and end dates based on billing cycle.
+    Returns pandas Timestamps for comparison with datetime64 columns.
+    cycle: string like "21-20", "25-24", "26-25" or empty for default month
+    """
+    return get_billing_dates_pd(cycle, month, year)
 
 
 def process_onetime_billing(df, billing_month, billing_year):
@@ -30,13 +41,38 @@ def process_onetime_billing(df, billing_month, billing_year):
     annex_rows = []
     error_rows = []
     
-    # Filter new joiners: employees who joined in the billing month
-    new_joiners = df[
-        (df["Date of Joining"].dt.month == billing_month) & 
-        (df["Date of Joining"].dt.year == billing_year)
-    ].copy()
+    # Get billing cycle from employee data, default to empty if not present
+    if "Billing Cycle" not in df.columns:
+        df["Billing Cycle"] = ""
     
-    print(f"Found {len(new_joiners)} new joiners for {billing_month}/{billing_year}")
+    # For each unique billing cycle, get the date range and filter employees who joined within that period
+    new_joiners_list = []
+    
+    # Get unique billing cycles from employees
+    unique_cycles = df["Billing Cycle"].fillna("").unique()
+    
+    for cycle in unique_cycles:
+        cycle_str = str(cycle)
+        start_date, end_date = get_billing_dates(cycle_str, billing_month, billing_year)
+        
+        # Filter employees who joined within this billing period
+        cycle_new_joiners = df[
+            (df["Billing Cycle"].fillna("").astype(str) == cycle_str) &
+            (df["Date of Joining"] >= start_date) &
+            (df["Date of Joining"] <= end_date)
+        ]
+        
+        if not cycle_new_joiners.empty:
+            new_joiners_list.append(cycle_new_joiners)
+            print(f"Found {len(cycle_new_joiners)} new joiners for cycle {cycle_str} ({start_date.strftime('%d-%m-%Y')} to {end_date.strftime('%d-%m-%Y')})")
+    
+    # Combine all new joiners from different cycles
+    if new_joiners_list:
+        new_joiners = pd.concat(new_joiners_list, ignore_index=True)
+    else:
+        new_joiners = pd.DataFrame()
+    
+    print(f"Total new joiners found: {len(new_joiners)}")
     
     for _, row in new_joiners.iterrows():
         try:

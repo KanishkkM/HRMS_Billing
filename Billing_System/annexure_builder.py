@@ -1,14 +1,17 @@
 def build_annexure_row(row, totals, gst_values):
 
     cgst, sgst, igst, grand_total = gst_values
-
-    return {
+    
+    # Determine which GST type is being used
+    has_igst = igst > 0
+    
+    # Build base row data (without GST columns)
+    row_data = {
         "Kind Attention Person": row["Kind Attention Person"],
-        "Working At": row.get("Working At", ""),
         "Company Name": row["Company Name"],
         "Employee Code": row["Employee Code"],
         "Employee Name": row["Employee Name"],
-        "Billing Cycle": row.get("Billing Cycle"),  # Keep for bill template, removed from annexure output
+        "Billing Cycle": row.get("Billing Cycle"), 
         "Billing": round(row["Billing"], 2),
         "No of days": totals["total_days"],
         "Eligible Days": totals["eligible_days"],
@@ -25,9 +28,15 @@ def build_annexure_row(row, totals, gst_values):
         "Out of Pocket Exp": round(row["Out of Pocket Exp"], 2),
         "Arrears": round(row["Arrears"], 2),
         "Total": round(totals["total"], 2),
-        "CGST @9%": round(cgst, 2),
-        "SGST @9%": round(sgst, 2),
-        "IGST @18%": round(igst, 2),
         "Grand Total": round(grand_total, 2),
         "Remark": row.get("Remark", "")
     }
+    
+    # Add only the applicable GST columns
+    if has_igst:
+        row_data["IGST @18%"] = round(igst, 2)
+    else:
+        row_data["CGST @9%"] = round(cgst, 2)
+        row_data["SGST @9%"] = round(sgst, 2)
+    
+    return row_data

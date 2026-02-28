@@ -389,7 +389,6 @@ def generate_unified_bills(annex_df):
         # Collect summary data - dynamically handle GST columns
         summary_data = {
             "Kind Attention Person": group_clean.iloc[0]["Kind Attention Person"] if len(group_clean) > 0 else "",
-            "Working At": group_clean.iloc[0]["Working At"] if len(group_clean) > 0 else "",
             "Company Name": company_name,
             "No of Employees": len(group_clean),
             "Total Billing": round(group_clean["Billing"].sum()),
